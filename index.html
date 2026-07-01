@@ -96,7 +96,7 @@
             // }, 'image/png');
         }
 
-        function extractText() {
+        async function extractText() {
 			const { data } = await Tesseract.recognize(canvas, 'eng');
 			document.getElementById('image-text').innerHTML = data.text;
      //        Tesseract.recognize(file)

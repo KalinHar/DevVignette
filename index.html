@@ -89,22 +89,25 @@
             // canvas.style.display = 'block';
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             photo.src = canvas.toDataURL('image/png');
-            canvas.toBlob(blob => {
-                const file = new File([blob], "captured_image.png", { type: "image/png" });
-                extractTextFromImage(file);
-            }, 'image/png');
+			extractText();
+            // canvas.toBlob(blob => {
+            //     const file = new File([blob], "captured_image.png", { type: "image/png" });
+            //     extractTextFromImage(file);
+            // }, 'image/png');
         }
 
-        function extractTextFromImage(file) {
-            Tesseract.recognize(file)
-                .then(function(result){
-                    var contentArea = document.getElementById('image-text');
-					contentArea.innerHTML = result.text;
-                    console.log(result);
-                })
-                .catch(function(err){
-                    console.error(err);
-                });
+        function extractText() {
+			const { data } = await Tesseract.recognize(canvas, 'eng');
+			document.getElementById('image-text').innerHTML = data.text;
+     //        Tesseract.recognize(file)
+     //            .then(function(result){
+     //                var contentArea = document.getElementById('image-text');
+					// contentArea.innerHTML = result.text;
+     //                console.log(result);
+     //            })
+     //            .catch(function(err){
+     //                console.error(err);
+     //            });
         }
 
         function getData() {

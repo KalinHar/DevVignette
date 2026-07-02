@@ -137,7 +137,7 @@
             result.textContent = 'Extracting text...';
 
             try {
-                const { data } = await Tesseract.recognize(file, 'eng');
+                const data = await Tesseract.recognize(file, 'eng');
                 result.textContent = data.text;
             } catch (err) {
                 result.textContent = 'Error: ' + err.message;

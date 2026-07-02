@@ -50,6 +50,16 @@
     <div>
         <h1 class="h-mar" id="inspection-result"></h1>
     </div>
+	<div>
+		<button id="scanBtn">Take Photo</button>
+		<input
+	        type="file"
+	        id="camera"
+	        accept="image/*"
+	        capture="environment"
+	        style="display:none">
+	    <pre id="result">No image selected</pre>
+	</div>
 
     <script>
         const cameraBlock = document.getElementById('camera-block');
@@ -109,6 +119,30 @@
      //                console.error(err);
      //            });
         }
+
+		const scanBtn = document.getElementById('scanBtn');
+        const camera = document.getElementById('camera');
+        const result = document.getElementById('result');
+
+        // Open camera/file picker only from button
+        scanBtn.addEventListener('click', () => {
+            camera.click();
+        });
+
+        // Process selected photo
+        camera.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            result.textContent = 'Extracting text...';
+
+            try {
+                const { data } = await Tesseract.recognize(file, 'eng');
+                result.textContent = data.text;
+            } catch (err) {
+                result.textContent = 'Error: ' + err.message;
+            }
+        });
 
         function getData() {
             const url = "https://check.bgtoll.bg/check/vignette/plate/BG/";

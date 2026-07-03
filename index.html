@@ -1,251 +1,258 @@
 <html lang="en">
+
 <head>
-    <meta charset="utf-8">
-    <meta content="width=device-width,maximum-scale=1.0,initial-scale=1.0,minimum-scale=1.0,user-scalable=yes,shrink-to-fit=no" name="viewport">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src='https://cdn.rawgit.com/naptha/tesseract.js/1.0.10/dist/tesseract.js'></script>
-    <title>Vinete</title>
+    <meta charset="utf-8" />
+    <meta
+        content="width=device-width,maximum-scale=1.0,initial-scale=1.0,minimum-scale=1.0,user-scalable=yes,shrink-to-fit=no"
+        name="viewport" />
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <title>Car Papers</title>
 </head>
+
 <body>
-    <div>
-        <h1 class="h-mar">Vignette Check</h1>
-    </div>
-    <div class="input-data">
+    <div class="card">
         <div>
-            <strong>License Plate Number: </strong>
-            <input type="text" value="P2244KH" id="licensePlateNumber" placeholder="Enter number">
+            <h1 class="h-mar">Car Papers</h1>
         </div>
+
+        <div class="input-data">
+            <div>
+                <strong>Favorites: </strong>
+                <select id="favoritesSelect" onchange="selectFavorite(this.value)">
+                    <option value="">-- Select --</option>
+                </select>
+            </div>
+
+            <div>
+                <strong>Number: </strong>
+                <input type="text" id="licensePlateNumber" />
+                <button id="addBtn" onclick="addFavorite()" disabled>Add to favorites</button>
+                <div id="validationMsg"></div>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button onClick="checkVignette()">Check Vignette</button>
+            <button onClick="checkInsurance()">Check Insurance</button>
+            <button onClick="checkGTP()">Check Inspection (GTP)</button>
+        </div>
+
+        <div class="relative-box">
+            <h1 class="h-mar" id="vignette-result"></h1>
+            <span class="clear-x" onclick="clearVignetteResult()">×</span>
+        </div>
+
         <div>
-            <strong>*Use only Uppercase Latin and Numbers without spaces!</strong>
+            <button id="scanBtn">Take Photo</button>
+            <input type="file" id="camera" accept="image/*" capture="environment" style="display:none">
+            <div class="relative-box">
+                <pre id="photoResult">Take photo to get number</pre>
+                <span class="clear-x" onclick="clearPhotoText()">×</span>
+            </div>
+            <button onClick="addPhotoText()">Add Number</button>
         </div>
     </div>
-    <br>
-    <div>
-        <button onClick="getData()">Check Vignette</button>
-        <button onClick="getInsurance()">Check Insurance</button>
-        <button onClick="getInspection()">Check Inspection</button>
-
-        <button id="cam-btn" onClick="cameraOnOff()">Camera ON</button>
-    </div>
-
-    <br>
-    <div id="camera-block" style="display:none;" >
-        <video id="video" width="300" height="200" autoplay></video>
-        <button onClick="capturePhoto()">Capture</button>
-        <canvas id="canvas" style="display:none;"></canvas>
-        <br />
-        <div class="container mb-1">
-            <img id="photo" alt="Captured Image" width="300" height="200"/>
-          </div>
-        <div id="image-text" style="width: 300px;"></div>
-		<br/><br/>
-    </div>
-    <div>
-        <h1 class="h-mar" id="vignette-result"></h1>
-    </div>
-    <div>
-        <h1 class="h-mar" id="insurance-result"></h1>
-    </div>
-    <div>
-        <h1 class="h-mar" id="inspection-result"></h1>
-    </div>
-	<div>
-		<button id="scanBtn">Take Photo</button>
-		<input
-	        type="file"
-	        id="camera"
-	        accept="image/*"
-	        capture="environment"
-	        style="display:none">
-	    <pre id="result">No image selected</pre>
-	</div>
 
     <script>
-        const cameraBlock = document.getElementById('camera-block');
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const photo = document.getElementById('photo');
-        const currentFacingMode = 'environment';
+        const favorites = ["BT5609KX", "P2244KH", "P6792BH"];
+        const plateRegex = /^[A-Z0-9]+$/;
 
-        function cameraOnOff() {
-            let stream = video.srcObject;
-            if (stream) {
-                let tracks = stream.getTracks();
-                tracks.forEach(track => track.stop());
-                video.srcObject = null;
-                cameraBlock.style.display = 'none';
-                document.getElementById('cam-btn').textContent = 'Camera ON';
+        const favoritesSelect = document.getElementById("favoritesSelect");
+        const plateNumber = document.getElementById("licensePlateNumber");
+        const addButton = document.getElementById("addBtn");
+        const msg = document.getElementById("validationMsg");
+        const resultField = document.getElementById("vignette-result");
+
+        plateNumber.addEventListener("input", () => {
+            plateNumber.value = plateNumber.value.toUpperCase();
+            const value = plateNumber.value;
+
+            if (value.length === 0) {
+                addButton.disabled = true;
+                msg.textContent = "";
+                return;
+            }
+
+            if (!plateRegex.test(value)) {
+                addButton.disabled = true;
+                msg.textContent = "Only letters (A–Z) and numbers (0–9) are allowed.";
             } else {
-                navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } })
-                .then(stream => {
-                    video.srcObject = stream;
-                })
-                .catch(err => console.error('Error accessing camera:', err));
-                cameraBlock.style.display = 'block';
-                document.getElementById('cam-btn').textContent = 'Camera OFF';
+                addButton.disabled = false;
+                msg.textContent = "";
+            }
+        });
+
+        setOptions();
+
+        function setOptions() {
+            while (favoritesSelect.children.length > 1) {
+                favoritesSelect.removeChild(favoritesSelect.lastChild);
+            }
+
+            favorites.forEach((plate) => {
+                const option = document.createElement("option");
+                option.value = plate;
+                option.textContent = plate;
+                favoritesSelect.appendChild(option);
+            });
+        }
+
+        function selectFavorite(plate) {
+            plateNumber.value = plate;
+        }
+
+        function addFavorite() {
+            if (favorites.includes(plateNumber.value)) return;
+            favorites.push(plateNumber.value);
+            setOptions();
+        }
+
+        function clearVignetteResult() {
+            resultField.innerText = "";
+        }
+
+        async function checkVignette() {
+            if (!plateNumber.value) return;
+            try {
+                const response = await axios.get(
+                    `https://check.bgtoll.bg/check/vignette/plate/BG/${plateNumber.value}`,
+                );
+                if (response.data.vignette) {
+                    resultField.innerText = `The vehicle has a valid vignette to ${response.data.vignette.validityDateToFormated}`;
+                } else {
+                    resultField.innerText = "The vehicle doesn't have a valid vignette!";
+                }
+            } catch (err) {
+                console.error(
+                    "Get Vignette error:",
+                    err.response?.data || err.message,
+                );
+                resultField.innerText = '';
             }
         }
-        function toggleCamera() {
-            cameraOff(); // Stop current camera first
-            currentFacingMode = (currentFacingMode === "user") ? "environment" : "user"; // Switch camera
-            cameraOn(); // Restart camera with new mode
+
+        function checkInsurance() {
+            const lpn = plateNumber.value.replace(/\s+/g, "");
+            navigator.clipboard.writeText(lpn);
+            window.open(
+                "https://www.guaranteefund.org/bg/%D0%B8%D0%BD%D1%84%D0%BE%D1%80%D0%BC%D0%B0%D1%86%D0%B8%D0%BE%D0%BD%D0%B5%D0%BD-%D1%86%D0%B5%D0%BD%D1%82%D1%8A%D1%80-%D0%B8-%D1%81%D0%BF%D1%80%D0%B0%D0%B2%D0%BA%D0%B8/%D1%83%D1%81%D0%BB%D1%83%D0%B3%D0%B8/%D0%BF%D1%80%D0%BE%D0%B2%D0%B5%D1%80%D0%BA%D0%B0-%D0%B7%D0%B0-%D0%B2%D0%B0%D0%BB%D0%B8%D0%B4%D0%BD%D0%B0-%D0%B7%D0%B0%D1%81%D1%82%D1%80%D0%B0%D1%85%D0%BE%D0%B2%D0%BA%D0%B0-%D0%B3%D1%80a%D0%B6%D0%B4a%D0%BD%D1%81%D0%BAa-%D0%BE%D1%82%D0%B3%D0%BE%D0%B2%D0%BE%D1%80%D0%BD%D0%BE%D1%81%D1%82-%D0%BD%D0%B0-%D0%B0%D0%B2%D1%82%D0%BE%D0%BC%D0%BE%D0%B1%D0%B8%D0%BB%D0%B8%D1%81%D1%82%D0%B8%D1%82%D0%B5",
+                "_blank",
+            );
         }
 
-        function capturePhoto() {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            // canvas.style.display = 'block';
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            photo.src = canvas.toDataURL('image/png');
-			extractText();
-            // canvas.toBlob(blob => {
-            //     const file = new File([blob], "captured_image.png", { type: "image/png" });
-            //     extractTextFromImage(file);
-            // }, 'image/png');
+        function checkGTP() {
+            const lpn = plateNumber.value.replace(/\s+/g, "");
+            navigator.clipboard.writeText(lpn);
+            window.open(
+                "https://rta.government.bg/services/check-inspection/",
+                "_blank",
+            );
         }
 
-        async function extractText() {
-			const data = await Tesseract.recognize(canvas, 'eng');
-			document.getElementById('image-text').innerText = data;
-     //        Tesseract.recognize(file)
-     //            .then(function(result){
-     //                var contentArea = document.getElementById('image-text');
-					// contentArea.innerHTML = result.text;
-     //                console.log(result);
-     //            })
-     //            .catch(function(err){
-     //                console.error(err);
-     //            });
-        }
-
-		const scanBtn = document.getElementById('scanBtn');
+        // == Photo extractor ==
+        const scanBtn = document.getElementById('scanBtn');
         const camera = document.getElementById('camera');
-        const result = document.getElementById('result');
+        const photoResult = document.getElementById('photoResult');
 
-        // Open camera/file picker only from button
+        // Open camera/file picker
         scanBtn.addEventListener('click', () => {
             camera.click();
         });
 
-        // Process selected photo
+        // Processing photo
         camera.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
-            result.textContent = 'Extracting text...';
-
+            photoResult.textContent = 'Extracting text...';
             try {
-                const data = await Tesseract.recognize(file, 'eng');
-                result.textContent = data.text;
+                const { data } = await Tesseract.recognize(file, 'eng');
+                const value = data.text.trim().toUpperCase();
+                if (value.length < 11 && plateRegex.test(value)) {
+                    photoResult.textContent = value;
+                    plateNumber.value = value;
+                    addButton.disabled = false;
+                } else {
+                    photoResult.textContent = 'Invalid data: \n' + data.text;
+                }
             } catch (err) {
-                result.textContent = 'Error: ' + err.message;
+                photoResult.textContent = 'Error: ' + err.message;
             }
         });
 
-        function getData() {
-            const url = "https://check.bgtoll.bg/check/vignette/plate/BG/";
-            var lpn = document.getElementById('licensePlateNumber').value.replace(/\s+/g, '');
-            var resultField = document.getElementById('vignette-result');
-            console.log(lpn);
-            fetch(url + lpn)
-            .then(response => {
-                if (!response.ok) {
-                throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log(data);
-                if (data.vignette) {
-                    resultField.innerText = `The vehicle has a valid vignette to ${data.vignette.validityDateToFormated}`;
-                } else {
-                    resultField.innerText = "The vehicle doesn't have a valid vignette!";
-                }
-                
-            })
-            .catch(error => {
-                console.error('Fetch error:', error);
-            });
-
+        function addPhotoText() {
+            plateNumber.value = photoResult.textContent;
+            addButton.disabled = false;
         }
 
-        function getInsurance() {
-            const url = "https://www.guaranteefund.org/bg/%D0%B8%D0%BD%D1%84%D0%BE%D1%80%D0%BC%D0%B0%D1%86%D0%B8%D0%BE%D0%BD%D0%B5%D0%BD-%D1%86%D0%B5%D0%BD%D1%82%D1%8A%D1%80-%D0%B8-%D1%81%D0%BF%D1%80%D0%B0%D0%B2%D0%BA%D0%B8/%D1%83%D1%81%D0%BB%D1%83%D0%B3%D0%B8/%D0%BF%D1%80%D0%BE%D0%B2%D0%B5%D1%80%D0%BA%D0%B0-%D0%B7%D0%B0-%D0%B2%D0%B0%D0%BB%D0%B8%D0%B4%D0%BD%D0%B0-%D0%B7%D0%B0%D1%81%D1%82%D1%80%D0%B0%D1%85%D0%BE%D0%B2%D0%BA%D0%B0-%D0%B3%D1%80a%D0%B6%D0%B4a%D0%BD%D1%81%D0%BAa-%D0%BE%D1%82%D0%B3%D0%BE%D0%B2%D0%BE%D1%80%D0%BD%D0%BE%D1%81%D1%82-%D0%BD%D0%B0-%D0%B0%D0%B2%D1%82%D0%BE%D0%BC%D0%BE%D0%B1%D0%B8%D0%BB%D0%B8%D1%81%D1%82%D0%B8%D1%82%D0%B5";
-            var lpn = document.getElementById('licensePlateNumber').value;
-            var resultInspection = document.getElementById('insurance-result');
-            var requestData = {dkn: lpn, date: "06/06/2024", send: "търси", rama: "", stiker: "", seria: ""};
-
-            fetch(url, {method: "POST", body: JSON.stringify(requestData)} )
-            .then(response => {
-                if (!response.ok) {
-                throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log(data);
-                if (data.nextInspectionDate) {
-                    resultInspection.innerText = `The vehicle has a valid insurance to ${data.nextInspectionDate}`;
-                } else {
-                    resultInspection.innerText = "The vehicle doesn't have a valid insurance!";
-                }
-                
-            })
-            .catch(error => {
-                console.error('Fetch error:', error);
-            });
-
+        function clearPhotoText() {
+            photoResult.textContent = 'Take photo to get number';
         }
 
-        function getInspection() {
-            const url = "https://rta.government.bg/services/check-inspection/checkinsp.php";
-            var lpn = document.getElementById('licensePlateNumber').value;
-            var resultInspection = document.getElementById('inspection-result');
-            var requestData = {regNum: lpn, captcha: "6cx4"};
-
-            fetch(url, {method: "POST", body: JSON.stringify(requestData)} )
-            .then(response => {
-                if (!response.ok) {
-                throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log(data);
-                if (data.nextInspectionDate) {
-                    resultInspection.innerText = `The vehicle has a valid inspection to ${data.nextInspectionDate}`;
-                } else {
-                    resultInspection.innerText = "The vehicle doesn't have a valid inspection!";
-                }
-                
-            })
-            .catch(error => {
-                console.error('Fetch error:', error);
-            });
-
-        }
     </script>
 
     <style>
-        body { background-color: rgb(239, 238, 238); font-family: monospace; }
-        .input-data input { width: 8em; margin-bottom: 1em; }
-        .h-mar { margin-top: 0.4em; margin-bottom: 0.6em; }
-        video { display: block; margin: 10px 0; border: 1px solid #ccc; }
-        /* body {
+        body {
             background-color: rgb(239, 238, 238);
-        }
-        .input-data input {
-            width:8em;
-            margin-bottom: 1em;
-        }
-        div {
             font-family: monospace;
+            font-size: large;
         }
+
+        .card {
+            display: flex;
+            flex-direction: column;
+            gap: 1em;
+        }
+
+        .card div {
+            margin: auto;
+        }
+
+        .input-data input {
+            width: 6em;
+            margin-top: 0.5em;
+        }
+
         .h-mar {
             margin-top: 0.4em;
             margin-bottom: 0.6em;
-        } */
+        }
+
+        .btn-group {
+            display: flex;
+            gap: .5em;
+        }
+
+        #validationMsg {
+            color: red;
+            margin-top: 0.25em;
+            font-size: medium;
+        }
+
+        .relative-box {
+            position: relative;
+            padding: 0.5em;
+            margin: 1em 0 1em !important;
+            background: #f5f5f5;
+            border-radius: 5px;
+            min-height: 40px;
+        }
+
+        .clear-x {
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #666;
+            line-height: 1;
+        }
+
+        .clear-x:hover {
+            color: #000;
+        }
     </style>
 </body>
+
+</html>
